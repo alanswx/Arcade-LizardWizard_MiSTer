@@ -71,6 +71,10 @@ generic (
     dipsw_reg             : in  std_logic_vector(7 downto 0);
 
     --
+    dn_addr    : in  std_logic_vector(15 downto 0);
+    dn_data    : in  std_logic_vector(7 downto 0);
+    dn_wr      : in  std_logic;
+    --
     RESET                 : in    std_logic;
 	 CLK      				  : in    std_logic;
     ENA_6   		        : in  std_logic
@@ -141,7 +145,12 @@ architecture RTL of PACMAN is
     signal watchdog_cnt     : std_logic_vector(3 downto 0);
     signal watchdog_reset_l : std_logic;
 
+	signal rom0_cs,rom1_cs  : std_logic;
+
 begin
+
+rom0_cs <= '1' when dn_addr(15 downto 14) = "00" else '0';
+rom1_cs <= '1' when dn_addr(15 downto 14) = "01" else '0';
   
   --
   -- video timing
@@ -546,31 +555,41 @@ begin
 	u_rams : work.dpram generic map (12,8)
 	port map
 	(
-		clk_a_i  => clk,
-		en_a_i   => ena_6,
-		we_i     => not sync_bus_r_w_l and not vram_l,
-		addr_a_i => ab(11 downto 0),
-		data_a_i => cpu_data_out, -- cpu only source of ram data
+		clock_a   => clk,
+		enable_a  => ena_6,
+		wren_a    => not sync_bus_r_w_l and not vram_l,
+		address_a => ab(11 downto 0),
+		data_a    => cpu_data_out, -- cpu only source of ram data
 		
-		clk_b_i  => clk,
-		addr_b_i => ab(11 downto 0),
-		data_b_o => rams_data_out
+		clock_b   => clk,
+		address_b => ab(11 downto 0),
+		q_b       => rams_data_out
 	);
 
-  -- example of internal program rom, if you have a big enough device
-  u_program_rom : entity work.ROM_PGM_0
-    port map (
-      CLK         => clk,
-      ADDR        => cpu_addr(13 downto 0),
-      DATA        => program_rom_dinl
+	u_program_rom0 : work.dpram generic map (14,8)
+	port map
+	(
+		clock_a   => clk,
+		wren_a    => dn_wr and rom0_cs,
+		address_a => dn_addr(13 downto 0),
+		data_a    => dn_data,
+	
+		clock_b   => clk,
+		address_b => cpu_addr(13 downto 0),
+		q_b       => program_rom_dinl
       );
 
-  -- example of internal program rom, if you have a big enough device
-  u_program_rom1 : entity work.ROM_PGM_1
-    port map (
-      CLK         => clk,
-      ADDR        => cpu_addr(12 downto 0),
-      DATA        => program_rom_dinh
+	u_program_rom1 : work.dpram generic map (14,8)
+	port map
+	(
+		clock_a   => clk,
+		wren_a    => dn_wr and rom1_cs,
+		address_a => dn_addr(13 downto 0),
+		data_a    => dn_data,
+	
+		clock_b   => clk,
+		address_b => cpu_addr(13 downto 0),
+		q_b       => program_rom_dinh
       );
 
   --
@@ -591,6 +610,10 @@ begin
       I_VBLANK      => vblank,
       I_FLIP        => control_reg(3),
       I_WR2_L       => wr2_l,
+      --
+      dn_addr   => dn_addr,
+      dn_data   => dn_data,
+      dn_wr     => dn_wr,
       --
       O_RED         => O_VIDEO_R,
       O_GREEN       => O_VIDEO_G,

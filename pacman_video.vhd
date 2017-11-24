@@ -64,6 +64,10 @@ port (
 	I_FLIP            : in    std_logic;
 	I_WR2_L           : in    std_logic;
 	--
+	dn_addr           : in  std_logic_vector(15 downto 0);
+	dn_data           : in  std_logic_vector(7 downto 0);
+	dn_wr             : in  std_logic;
+	--
 	O_RED             : out   std_logic_vector(2 downto 0);
 	O_GREEN           : out   std_logic_vector(2 downto 0);
 	O_BLUE            : out   std_logic_vector(1 downto 0);
@@ -117,7 +121,11 @@ architecture RTL of PACMAN_VIDEO is
 	signal video_op_sel       : std_logic;
 	signal final_col          : std_logic_vector(3 downto 0);
 
+	signal gfx_cs             : std_logic;
+
 begin
+
+	gfx_cs  <= '1' when dn_addr(15 downto 14) = "10" else '0';
 
 	-- ram enable is low when HBLANK_L is 0 (for sprite access) or
 	-- 2H is low (for cpu writes)
@@ -127,15 +135,15 @@ begin
 	sprite_xy_ram : work.dpram generic map (4,8)
 	port map
 	(
-		clk_a_i  => CLK,
-		en_a_i   => ENA_6,
-		we_i     => not I_WR2_L,
-		addr_a_i => I_AB(3 downto 0),
-		data_a_i => I_DB,
+		clock_a   => CLK,
+		enable_a  => ENA_6,
+		wren_a    => not I_WR2_L,
+		address_a => I_AB(3 downto 0),
+		data_a    => I_DB,
 
-		clk_b_i  => CLK,
-		addr_b_i => I_AB(3 downto 0),
-		data_b_o => sprite_xy_ram_temp
+		clock_b   => CLK,
+		address_b => I_AB(3 downto 0),
+		q_b       => sprite_xy_ram_temp
 	);
 
 	p_char_regs : process
@@ -214,11 +222,17 @@ begin
 	char_rom_5ef_dout <= char_rom_5ef_buf(7) & char_rom_5ef_buf(4) & char_rom_5ef_buf(5) & char_rom_5ef_buf(6) & char_rom_5ef_buf(3 downto 0) when MRTNT = '1' else char_rom_5ef_buf;
 
 	-- char roms
-	char_rom_5ef : entity work.GFX1
-	port map (
-		CLK         => CLK,
-		ADDR        => ca,
-		DATA        => char_rom_5ef_buf
+	char_rom_5ef : work.dpram generic map (13,8)
+	port map
+	(
+		clock_a   => clk,
+		wren_a    => dn_wr and gfx_cs,
+		address_a => dn_addr(12 downto 0),
+		data_a    => dn_data,
+	
+		clock_b   => clk,
+		address_b => ca,
+		q_b       => char_rom_5ef_buf
 	);
 
 	p_char_shift : process
@@ -300,15 +314,16 @@ begin
 	u_sprite_ram : work.dpram generic map (8,4)
 	port map
 	(
-		clk_a_i  => CLK,
-		en_a_i   => ENA_6,
-		we_i     => vout_obj_on_t1,
-		addr_a_i => ra_t1,
-		data_a_i => sprite_ram_ip,
-
-		clk_b_i  => CLK,
-		addr_b_i => ra,
-		data_b_o => sprite_ram_op
+		clock_a   => CLK,
+		enable_a  => ENA_6,
+		wren_a    => vout_obj_on_t1,
+		address_a => ra_t1,
+		data_a    => sprite_ram_ip,
+	
+		clock_b   => CLK,
+		enable_b  => ENA_6,
+		address_b => ra,
+		q_b       => sprite_ram_op
 	);
 
 	sprite_ram_reg <= sprite_ram_op when vout_obj_on_t1 = '1' else "0000";
