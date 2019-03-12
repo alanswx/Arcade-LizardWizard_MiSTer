@@ -1,7 +1,8 @@
 @echo off
 
 set    zip=lizwiz.zip
-set ifiles=6e.cpu+6f.cpu+6h.cpu+6j.cpu+wiza+wizb+wiza+wizb+5e.cpu+5f.cpu
+set ifiles=6e.cpu+6f.cpu+6h.cpu+6j.cpu+wiza+wizb+wiza+wizb+5e.cpu+5f.cpu+5e.cpu+5f.cpu+82s126.1m+4a.cpu+82s126.3m+7f.cpu)
+
 set  ofile=a.lizwiz.rom
 
 rem =====================================
